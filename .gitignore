@@ -2,3 +2,4 @@
 .idea
 uv.lock
 pyproject.toml
+settings.json

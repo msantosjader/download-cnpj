@@ -1,5 +1,5 @@
 import asyncio
-from nicegui import ui
+from nicegui import ui, run
 from datetime import datetime
 from settings import load_settings, save_settings, restore_default_settings
 from folder_picker import LocalFolderPicker
@@ -21,6 +21,7 @@ def render_layout(content_function):
         with ui.row().classes('w-full items-center justify-between'):
             ui.label('Download Base CNPJ').classes('text-2xl font-bold tracking-wide')
             with ui.row().classes('gap-x-2 items-center no-wrap'):
+                ui.button(icon='refresh', on_click=lambda: ui.navigate.to('/')).props('flat color=white size="lg"')
                 ui.button(icon='settings', on_click=lambda: drawer.toggle()).props('flat color=white size="lg"')
     with ui.right_drawer().style('background-color: #d7e3f4').classes('items-center') as drawer:
         with ui.card().classes('w-full items-center relative'):
@@ -91,10 +92,9 @@ def download_page():
                                     card.delete()
                                     task_cards.remove((card, task))
 
-                        ui.button(icon='cleaning_services', on_click=refresh_cards) \
+                        ui.button(icon='settings_backup_restore', color='primary', on_click=refresh_cards) \
                             .props('size=md').classes('flex-shrink-0')
-                    download_container = ui.column().classes('space-y-4').style('max-height: 400px; overflow-y: auto;')
-
+                    download_container = ui.column().classes('space-y-4').style('max-height: 385px; overflow-y: auto;')
 
         async def build_tree():
             nonlocal file_map, tree
@@ -153,19 +153,7 @@ def download_page():
                                label_key='label',
                                tick_strategy='leaf',
                                on_tick=lambda e: setattr(tree, 'selected', e.value)
-                               ).classes('w-full text-lg').props('html-label').style('max-height: 385px; overflow-y: auto;')
-
-        async def load_data():
-            nonlocal spinner, loading_label
-            await asyncio.sleep(0.1)
-            await atualizar_rfb_data(False)
-
-            with tree_card:
-                ui.notify("Informações atualizadas!", type='positive')
-                spinner.delete()
-                loading_label.delete()
-
-            await build_tree()
+                               ).classes('w-full text-lg border rounded-md').props('html-label').style('max-height: 385px; overflow-y: auto;')
 
         async def start_download():
             download_container.clear()
@@ -196,7 +184,18 @@ def download_page():
                             with ui.row().classes('justify-between items-center mt-2'):
                                 task.ui_elements['status'] = ui.label('Na fila')
 
-            await download_manager.start_downloads()
+            asyncio.create_task(download_manager.start_downloads())
+            await build_tree()
+
+        async def load_data():
+            nonlocal spinner, loading_label
+
+            await asyncio.sleep(0.1)
+            await run.io_bound(atualizar_rfb_data, False)
+            with tree_card:
+                ui.notify("Informações atualizadas!", type='positive')
+                spinner.delete()
+                loading_label.delete()
             await build_tree()
 
         ui.timer(0.1, lambda: asyncio.create_task(load_data()), once=True)

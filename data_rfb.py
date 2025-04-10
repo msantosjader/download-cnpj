@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from settings import SETTINGS_FILE, DEFAULT_RFB_URL, load_settings
-from nicegui import ui
 
 # Número de meses recentes a considerar
 NUM_RECENT = 1
@@ -177,7 +176,8 @@ def update_latest_rfb_available(dados_novos: dict):
     print(f"Última verificação: {current_settings['rfb_last_check']}")
 
 
-async def atualizar_rfb_data(manual: bool = False) -> bool:
+def atualizar_rfb_data(manual: bool = False) -> bool:
+
     """
     Atualiza dados da RFB:
       - Se manual=True, força a atualização e mostra "Aguarde..." no início.
@@ -195,7 +195,7 @@ async def atualizar_rfb_data(manual: bool = False) -> bool:
                 last_time = datetime.datetime.strptime(last_check, "%Y-%m-%d %H:%M:%S")
                 diff_h = (datetime.datetime.now() - last_time).total_seconds() / 3600
                 if diff_h < 1:
-                    print(f"Última verificação há {diff_h:.2f}h; pulando.")
+                    print(f"Última verificação há {diff_h:.2f}h. Aguardar 1 hora.")
                     return False
             except (ValueError, TypeError):
                 print("Formato de data inválido, forçando atualização.")
