@@ -208,6 +208,8 @@ class DownloadManager:
                     continue
                 else:
                     task.set_status("failed", f"Falhou")
+                    if task.ui_elements.get('status'):
+                        task.ui_elements['status'].text = f"Todas as {MAX_RETRIES} tentativas falharam"
                     print(f"Erro temporário: {e}")
                     return
 
