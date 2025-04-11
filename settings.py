@@ -4,18 +4,13 @@ import json
 from nicegui import ui
 
 APP_NAME = "DownloadCNPJ"
-ENVIRONMENT = "dev" # dev / prod
+ENV = "dev" # dev / prod
 
 #DATA_DOWNLOAD CONSTANTS
 MAX_RETRIES = 100 # Máximo de tentativas para baixar um arquivo
 CHUNK_TIMEOUT = 60 # Tempo máximo para baixar um chunk de um arquivo
 MAX_CONCURRENT_DOWNLOADS = 10 # Número máximo de downloads concorrentes
 CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/91.0.4472.124 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/15.1 Safari/605.1.15",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/103.0.0.0 Safari/537.36"
-] # Lista de User-Agents para usar no download
 
 # DATA_RFB CONSTANTS
 NUM_RECENT_MONTHS = 1 # Número de meses recentes a considerar
@@ -23,7 +18,7 @@ TIME_CHECK_INTERVAL = 3600  # 1 hora em segundos
 
 def get_settings_path():
     # dev coloca o settings no diretório do projeto
-    if ENVIRONMENT == "dev":
+    if ENV == "dev":
         return os.path.join(os.path.dirname(__file__), 'settings.json')
 
     # senão coloca o settings na pasta de configuração do sistema

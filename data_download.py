@@ -5,7 +5,13 @@ import aiofiles
 import time
 import random
 from typing import Dict, List, Optional
-from settings import load_settings, MAX_RETRIES, MAX_CONCURRENT_DOWNLOADS, CHUNK_SIZE, CHUNK_TIMEOUT, USER_AGENTS
+from settings import load_settings, MAX_RETRIES, MAX_CONCURRENT_DOWNLOADS, CHUNK_SIZE, CHUNK_TIMEOUT
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/91.0.4472.124 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/15.1 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/103.0.0.0 Safari/537.36"
+] # Lista de User-Agents para usar no download
 
 
 def format_size(bytes_size: float) -> str:
