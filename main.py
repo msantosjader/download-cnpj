@@ -1,8 +1,11 @@
 # main.py
 import sys
-from settings import check_settings_file
+from settings import check_settings_file, ENVIRONMENT
+from logs import Logger
 
-sys.stdout = open('logs.txt', 'w', encoding='utf-8')
+
+if ENVIRONMENT != 'dev':
+    sys.stdout = Logger('logs.txt')
 
 # roda sempre, mesmo em import — cria/atualiza settings.json
 check_settings_file()

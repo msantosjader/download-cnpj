@@ -23,6 +23,7 @@ dist/
 Thumbs.db
 
 # Arquivos temporários do projeto
+logs.txt
 *.log
 *.lock
 settings.json
