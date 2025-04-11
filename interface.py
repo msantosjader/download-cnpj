@@ -21,7 +21,10 @@ def render_layout(content_function):
         with ui.row().classes('w-full items-center justify-between'):
             ui.label('Download Base CNPJ').classes('text-2xl font-bold tracking-wide')
             with ui.row().classes('gap-x-2 items-center no-wrap'):
-                ui.button(icon='refresh', on_click=lambda: ui.navigate.to('/')).props('flat color=white size="lg"')
+                ui.button(icon='refresh', on_click=lambda:
+                ui.notify("Download em andamento", type='warning')
+                if download_manager.running else ui.navigate.to('/')
+                          ).props('flat color=white size="lg"')
                 ui.button(icon='settings', on_click=lambda: drawer.toggle()).props('flat color=white size="lg"')
     with ui.right_drawer().style('background-color: #d7e3f4').classes('items-center') as drawer:
         with ui.card().classes('w-full items-center relative'):
@@ -67,7 +70,7 @@ def render_layout(content_function):
 @ui.page('/')
 def download_page():
     def content():
-        ui.label('Download da Base de Dados').style('color: #00205B').classes('text-2xl font-bold mb-4')
+        ui.label('Download da Base de Dados').style('color: #00205B').classes('text-2xl font-bold')
 
         file_map = {}
         tree = None
@@ -81,20 +84,33 @@ def download_page():
                     loading_label = ui.label('Verificando a base de dados online...').classes('mt-2 text-gray')
                 with ui.card().classes('flex-1 p-2 items-stretch'):
                     ui.label('Downloads em andamento').classes('text-lg font-medium mb-2  text-center')
-                    with ui.row().classes('w-full gap-2'):
+                    with ui.row().classes('w-full gap-2 flex-nowrap items-center'):
                         ui.button('Cancelar Todos', icon='cancel', color='red', on_click=download_manager.cancel_all) \
                             .classes('flex-grow')
+
+                        def retry_failed():
+                            for task in download_manager.tasks:
+                                if task.status == "failed":
+                                    task.set_status("queued")
+                                    if task.ui_elements.get('status'):
+                                        task.ui_elements['status'].text = 'Na fila'
+                            asyncio.create_task(download_manager.start_downloads())
+
+                        ui.button(icon='restart_alt', color='orange', on_click=retry_failed) \
+                            .classes('flex-shrink-0')
 
                         def refresh_cards():
                             download_manager.clear_completed()
                             for card, task in list(task_cards):
-                                if task.status in ("completed", "failed"):
+                                if task.status in ("completed", "failed", 'cancelled'):
                                     card.delete()
                                     task_cards.remove((card, task))
 
-                        ui.button(icon='settings_backup_restore', color='primary', on_click=refresh_cards) \
-                            .props('size=md').classes('flex-shrink-0')
-                    download_container = ui.column().classes('space-y-4').style('max-height: 385px; overflow-y: auto;')
+                        ui.button(icon='cleaning_services', color='green', on_click=refresh_cards) \
+                            .classes('flex-shrink-0')
+
+                    download_container = ui.column().classes('space-y-1') \
+                        .style('max-height: 400px; overflow-y: auto;')
 
         async def build_tree():
             nonlocal file_map, tree
@@ -147,8 +163,10 @@ def download_page():
             with tree_card:
                 ui.label('Arquivos da Receita Federal').classes('text-lg font-medium mb-2')
                 ui.button('Baixar Selecionados', icon='download', color='primary',
-                          on_click=lambda: asyncio.create_task(start_download())) \
-                    .classes('w-full mb-4')
+                          on_click=lambda: asyncio.create_task(
+                              ui.notify("Download em andamento", type='warning')
+                              if download_manager.running else start_download()
+                          )).classes('w-full mb-4')
                 tree = ui.tree(tree_data,
                                label_key='label',
                                tick_strategy='leaf',
@@ -168,21 +186,30 @@ def download_page():
                 if info:
                     task = download_manager.add_task(
                         info['download_link'], info['month_key'], info['filename'], info['size'])
+
+                    task_cards.append(None)  # placeholder
+
                     with download_container:
-                        with ui.card().classes('w-full mb-4 p-3 items-stretch').style('min-width: 100%;') as card:
-                            task_cards.append((card, task))
+                        with ui.card().classes('w-full p-3 items-stretch').style('min-width: 100%;') as card:
+                            task_cards[-1] = (card, task)
                             with ui.row().classes('items-center gap-2'):
                                 task.ui_elements['status_icon'] = ui.icon('hourglass_empty').props('size=sm')
                                 ui.label(f"{info['filename']} ({info['month_key']})").classes('font-bold ml-2')
+
                                 cancel_btn = ui.button('Cancelar', icon='cancel', color='red') \
                                     .props('flat size=sm').classes('absolute top-2 right-2')
+                                task.ui_elements['cancel_btn'] = cancel_btn
                                 cancel_btn.on('click', lambda e, t=task, b=cancel_btn: (
                                     t.cancel_event.set(), b.set_visibility(False)))
 
-                            task.ui_elements['progress'] = ui.linear_progress(value=0, show_value=False, color='#00205B') \
+                            task.ui_elements['progress'] = ui.linear_progress(value=0, show_value=False,
+                                                                              color='#00205B') \
                                 .classes('w-full mt-2')
                             with ui.row().classes('justify-between items-center mt-2'):
                                 task.ui_elements['status'] = ui.label('Na fila')
+
+                    # Reaplica o status para atualizar a UI se o task já estiver concluído
+                    task.set_status(task.status)
 
             asyncio.create_task(download_manager.start_downloads())
             await build_tree()

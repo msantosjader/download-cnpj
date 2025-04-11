@@ -16,3 +16,4 @@ if __name__ == "__main__":
         title='Download CNPJ',
         favicon='https://i.ibb.co/PZXFSDp2/icons8-baixar-16.png'
     )
+
