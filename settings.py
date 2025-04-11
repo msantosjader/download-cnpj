@@ -4,7 +4,7 @@ import json
 from nicegui import ui
 
 APP_NAME = "DownloadCNPJ"
-ENV = "dev" # dev / prod
+ENV = "dev" # dev/prod
 
 #DATA_DOWNLOAD CONSTANTS
 MAX_RETRIES = 100 # Máximo de tentativas para baixar um arquivo

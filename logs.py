@@ -13,3 +13,6 @@ class Logger:
 
     def flush(self):
         self.file.flush()
+
+    def isatty(self):
+        return False  # comportamento esperado por sys.stdout em produção
