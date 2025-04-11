@@ -6,10 +6,8 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-from settings import SETTINGS_FILE, DEFAULT_RFB_URL, load_settings
+from settings import load_settings, SETTINGS_FILE_PATH, DEFAULT_RFB_URL, NUM_RECENT_MONTHS, TIME_CHECK_INTERVAL
 
-# Número de meses recentes a considerar
-NUM_RECENT = 1
 
 # Sessão para reutilizar conexões HTTP
 session = requests.Session()
@@ -62,7 +60,7 @@ def get_cnpj_zip_files() -> dict:
     rfb_url = settings_data.get("rfb_url", DEFAULT_RFB_URL)
 
     current_rfb_avail = settings_data.get("rfb_available", {})
-    threshold = get_threshold(current_rfb_avail, NUM_RECENT)
+    threshold = get_threshold(current_rfb_avail, NUM_RECENT_MONTHS)
 
     print("Etapa 1: Coletando pastas de mês-ano...")
     soup_base = obter_conteudo(rfb_url)
@@ -154,7 +152,7 @@ def update_latest_rfb_available(dados_novos: dict):
     current_settings = load_settings()
     current_rfb_avail = current_settings.get("rfb_available", {})
     rfb_url_base = current_settings.get("rfb_url", DEFAULT_RFB_URL)
-    threshold = get_threshold(current_rfb_avail, NUM_RECENT)
+    threshold = get_threshold(current_rfb_avail, NUM_RECENT_MONTHS)
 
     combined = current_rfb_avail.copy()
     for key, arquivos in dados_novos.items():
@@ -169,7 +167,7 @@ def update_latest_rfb_available(dados_novos: dict):
     current_settings["rfb_available"] = combined
     current_settings["rfb_last_check"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    with open(SETTINGS_FILE, 'w') as file:
+    with open(SETTINGS_FILE_PATH, 'w') as file:
         json.dump(current_settings, file, indent=4)  # type: ignore
 
     print("settings.json atualizado com novos registros e metadata.")
@@ -193,7 +191,7 @@ def atualizar_rfb_data(manual: bool = False) -> bool:
         if last_check:
             try:
                 last_time = datetime.datetime.strptime(last_check, "%Y-%m-%d %H:%M:%S")
-                diff_h = (datetime.datetime.now() - last_time).total_seconds() / 3600
+                diff_h = (datetime.datetime.now() - last_time).total_seconds() / TIME_CHECK_INTERVAL
                 if diff_h < 1:
                     print(f"Última verificação há {diff_h:.2f}h. Aguardar 1 hora.")
                     return False

@@ -4,7 +4,7 @@ from datetime import datetime
 from settings import load_settings, save_settings, restore_default_settings
 from folder_picker import LocalFolderPicker
 from data_rfb import atualizar_rfb_data, check_data_download
-from data_download import download_manager
+from data_download import download_manager, format_size
 
 
 def render_layout(content_function):
@@ -23,9 +23,11 @@ def render_layout(content_function):
             with ui.row().classes('gap-x-2 items-center no-wrap'):
                 ui.button(icon='refresh', on_click=lambda:
                 ui.notify("Download em andamento", type='warning')
-                if download_manager.running else ui.navigate.to('/')
-                          ).props('flat color=white size="lg"')
-                ui.button(icon='settings', on_click=lambda: drawer.toggle()).props('flat color=white size="lg"')
+                if download_manager.running else ui.navigate.to('/')) \
+                    .props('flat color=white size="lg"')
+                ui.button(icon='settings', on_click=lambda:  ui.notify("Download em andamento", type='warning')
+                if download_manager.running else drawer.toggle()) \
+                    .props('flat color=white size="lg"')
     with ui.right_drawer().style('background-color: #d7e3f4').classes('items-center') as drawer:
         with ui.card().classes('w-full items-center relative'):
             ui.button(icon='close', on_click=lambda: drawer.toggle()) \
@@ -63,6 +65,13 @@ def render_layout(content_function):
                         folder_ui.value = new_settings.get("download_path", "")
                         url_ui.value = new_settings.get("rfb_url", "")
 
+    with ui.footer().style('background-color: #f5f5f5; color: #444').classes('w-full justify-center items-center'):
+        with ui.row().classes('gap-2 items-center'):
+            ui.label('Jader Santos').classes('font-medium')
+            ui.link('GitHub', 'https://github.com/msantosjader', new_tab=True).classes('text-blue-700 underline')
+            ui.link('Instagram', 'https://instagram.com/msantosjader', new_tab=True).classes('text-blue-700 underline')
+            ui.link('LinkedIn ', 'https://www.linkedin.com/in/jader-santos-72162755/', new_tab=True).classes('text-blue-700 underline')
+
     with ui.column().classes('w-full items-center'):
         content_function()
 
@@ -83,7 +92,7 @@ def download_page():
                     spinner = ui.spinner('dots').props('size="xl"')
                     loading_label = ui.label('Verificando a base de dados online...').classes('mt-2 text-gray')
                 with ui.card().classes('flex-1 p-2 items-stretch'):
-                    ui.label('Downloads em andamento').classes('text-lg font-medium mb-2  text-center')
+                    ui.label('Status do Downloads').classes('text-lg font-medium mb-2 text-center')
                     with ui.row().classes('w-full gap-2 flex-nowrap items-center'):
                         ui.button('Cancelar Todos', icon='cancel', color='red', on_click=download_manager.cancel_all) \
                             .classes('flex-grow')
@@ -110,7 +119,7 @@ def download_page():
                             .classes('flex-shrink-0')
 
                     download_container = ui.column().classes('space-y-1') \
-                        .style('max-height: 400px; overflow-y: auto;')
+                        .style('max-height: 360px; overflow-y: auto;')
 
         async def build_tree():
             nonlocal file_map, tree
@@ -138,16 +147,21 @@ def download_page():
                     }
                     if is_ok:
                         encontrados += 1
-                    label = f"{file['name']} ({size / 1024 ** 2:.1f} MB)"
+
+                    formatted_size = format_size(round(size))
+                    if '.' in formatted_size:
+                        formatted_size = formatted_size.split('.')[0] + formatted_size.split(' ')[1]
+                    label = f"{file['name']} ({formatted_size})"
+
                     children.append({
                         'id': node_id,
                         'label': label,
                         'icon': 'check_circle' if is_ok else 'error',
-                        'icon_color': 'green' if is_ok else 'red'
+                        'iconColor': 'green' if is_ok else 'red'
                     })
 
                 icon, icon_color = ('check_circle', 'green') if encontrados == len(files) else \
-                                   ('error', 'red') if encontrados == 0 else \
+                                   ('cancel', 'red') if encontrados == 0 else \
                                    ('warning', 'orange')
                 display_label = f"{display_label} ({total_gb:.2f} GB)"
 
@@ -155,7 +169,7 @@ def download_page():
                     'id': month_key,
                     'label': display_label,
                     'icon': icon,
-                    'icon_color': icon_color,
+                    'iconColor': icon_color,
                     'children': children
                 })
 
@@ -171,7 +185,9 @@ def download_page():
                                label_key='label',
                                tick_strategy='leaf',
                                on_tick=lambda e: setattr(tree, 'selected', e.value)
-                               ).classes('w-full text-lg border rounded-md').props('html-label').style('max-height: 385px; overflow-y: auto;')
+                               ).classes('w-full text-lg border rounded-md').props('html-label').style('max-height: 360px; overflow-y: auto;')
+
+        download_manager.build_tree = build_tree
 
         async def start_download():
             download_container.clear()

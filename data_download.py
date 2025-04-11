@@ -5,17 +5,8 @@ import aiofiles
 import time
 import random
 from typing import Dict, List, Optional
-from settings import load_settings
+from settings import load_settings, MAX_RETRIES, MAX_CONCURRENT_DOWNLOADS, CHUNK_SIZE, CHUNK_TIMEOUT, USER_AGENTS
 
-MAX_RETRIES = 100
-CHUNK_TIMEOUT = 60
-MAX_CONCURRENT_DOWNLOADS = 10
-CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/91.0.4472.124 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/15.1 Safari/605.1.15",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/103.0.0.0 Safari/537.36"
-]
 
 def format_size(bytes_size: float) -> str:
     if bytes_size >= 1024 ** 3:
@@ -38,6 +29,7 @@ def format_time(seconds: float) -> str:
 class DownloadTask:
     def __init__(self, url: str, dest_path: str, file_size: int, month_key: str, filename: str):
         self.url = url
+        self._initial_size = 0
         self.dest_path = dest_path
         self.file_size = file_size
         self.month_key = month_key
@@ -56,23 +48,26 @@ class DownloadTask:
             self.start_time = now
         self.last_update_time = now
 
-        downloaded = os.path.getsize(self.dest_path) if os.path.exists(self.dest_path) else 0
-        elapsed = max(1e-6, now - self.start_time)
-        speed = downloaded / elapsed
-        remaining = max(self.file_size - downloaded, 0)
-        eta = remaining / speed if speed > 0 else None
+        downloaded_total = os.path.getsize(self.dest_path) if os.path.exists(self.dest_path) else 0
+        downloaded_now = max(0, downloaded_total - self._initial_size)
 
-        percent = min(100, int(downloaded * 100 / self.file_size))
+        percent = min(100, int(downloaded_total * 100 / self.file_size))
         if self.ui_elements.get('progress'):
             self.ui_elements['progress'].value = percent / 100
             self.ui_elements['progress'].props(f'label="{percent}%"')
 
+        elapsed = max(1e-6, now - self.start_time)
+        speed = downloaded_now / elapsed
+        remaining = self.file_size - downloaded_total
+        eta = remaining / speed if speed > 0 else None
+
+        downloaded_str = format_size(downloaded_total)
+        expected = format_size(self.file_size)
+        speed_str = f"{format_size(speed)}/s"
+        eta_str = format_time(eta) if eta else "Calculando..."
+
+        status_text = f"{speed_str} — {downloaded_str} de {expected}, {eta_str}"
         if self.ui_elements.get('status'):
-            downloaded_str = format_size(downloaded)
-            expected = format_size(self.file_size)
-            speed_str = format_size(speed) + '/s'
-            eta_str = format_time(eta) if eta else "Calculando..."
-            status_text = f"{speed_str} — {downloaded_str} de {expected}, {eta_str}"
             self.ui_elements['status'].text = status_text[:70] + '…' if len(status_text) > 70 else status_text
 
     def set_status(self, status: str, error: str = None):
@@ -107,6 +102,11 @@ class DownloadManager:
         self.max_concurrent_downloads = MAX_CONCURRENT_DOWNLOADS
         self.semaphore = asyncio.Semaphore(self.max_concurrent_downloads)
         self.running = False
+        self.expected_files_by_month: Dict[str, List[str]] = {}
+        self.tree = None
+        self.tree_card = None
+        self.download_container = None
+        self.build_tree = None  # será atribuído externamente
 
     def add_task(self, url: str, month_key: str, filename: str, file_size: int, force: bool = False) -> DownloadTask:
         settings = load_settings()
@@ -116,6 +116,11 @@ class DownloadManager:
         dest_path = os.path.join(month_dir, filename)
 
         task = DownloadTask(url, dest_path, file_size, month_key, filename)
+
+        if month_key not in self.expected_files_by_month:
+            self.expected_files_by_month[month_key] = []
+        if filename not in self.expected_files_by_month[month_key]:
+            self.expected_files_by_month[month_key].append(filename)
 
         if not force and os.path.exists(dest_path) and os.path.getsize(dest_path) == file_size:
             print(f"Arquivo já existe: {filename}, marcando como concluído.")
@@ -133,11 +138,14 @@ class DownloadManager:
                 return
 
             task.set_status("downloading")
-            task.start_time = time.monotonic()
-            task.last_update_time = task.start_time
+            now = time.monotonic()
+            if task.start_time is None:
+                task.start_time = now
+            task.last_update_time = now
             timeout = aiohttp.ClientTimeout(total=300)
 
             existing_size = os.path.getsize(task.dest_path) if os.path.exists(task.dest_path) else 0
+            task._initial_size = existing_size
 
             try:
                 async with self.semaphore:
@@ -158,8 +166,7 @@ class DownloadManager:
                             if content_length and content_length.isdigit():
                                 task.file_size = existing_size + int(content_length)
 
-                            mode = 'ab' if existing_size > 0 else 'wb'
-                            async with aiofiles.open(task.dest_path, mode) as f: # type: ignore
+                            async with aiofiles.open(task.dest_path, mode='ab' if existing_size > 0 else 'wb') as f:
                                 first_chunk = True
                                 while True:
                                     if task.cancel_event.is_set():
@@ -173,7 +180,7 @@ class DownloadManager:
                                     if first_chunk and existing_size == 0 and not chunk.startswith(b'PK'):
                                         raise aiohttp.ClientError("Conteúdo não parece ser um ZIP válido")
                                     first_chunk = False
-                                    await f.write(chunk) # type: ignore
+                                    await f.write(chunk)
                                     task.update_progress()
 
                 if task.cancel_event.is_set():
@@ -184,6 +191,11 @@ class DownloadManager:
                     return
 
                 task.set_status("completed")
+
+                # Atualiza a árvore após cada download
+                if self.build_tree:
+                    await self.build_tree()
+
                 return
 
             except (asyncio.TimeoutError, aiohttp.ClientError) as e:
@@ -194,8 +206,10 @@ class DownloadManager:
                         task.ui_elements['status'].text = f"Tentativa {attempt + 1} de {MAX_RETRIES}..."
                     await asyncio.sleep(random.uniform(1.5, 3.5))
                     continue
-                task.set_status("failed", f"Falhou")
-                return
+                else:
+                    task.set_status("failed", f"Falhou")
+                    print(f"Erro temporário: {e}")
+                    return
 
             except Exception as e:
                 task.set_status("failed", f"Erro: {str(e)}")
@@ -221,5 +235,6 @@ class DownloadManager:
 
     def clear_completed(self):
         self.tasks = [t for t in self.tasks if t.status not in ("completed", "failed")]
+
 
 download_manager = DownloadManager()

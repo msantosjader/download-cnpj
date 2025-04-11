@@ -1,5 +1,32 @@
-.venv
-.idea
-uv.lock
-pyproject.toml
+# Ignorar bytecode e cache do Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+
+# Ambientes virtuais
+.venv/
+env/
+venv/
+
+# Diretórios de build
+build/
+dist/
+*.spec
+
+# IDEs
+.idea/
+.vscode/
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos temporários do projeto
+*.log
+*.lock
 settings.json
+uv.lock
+
+# Ícones e arquivos gerados
+app.ico
