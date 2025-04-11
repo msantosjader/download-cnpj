@@ -65,12 +65,12 @@ def render_layout(content_function):
                         folder_ui.value = new_settings.get("download_path", "")
                         url_ui.value = new_settings.get("rfb_url", "")
 
-    with ui.footer().style('background-color: #f5f5f5; color: #444').classes('w-full justify-center items-center'):
-        with ui.row().classes('gap-2 items-center'):
-            ui.label('Jader Santos').classes('font-medium')
-            ui.link('GitHub', 'https://github.com/msantosjader', new_tab=True).classes('text-blue-700 underline')
-            ui.link('Instagram', 'https://instagram.com/msantosjader', new_tab=True).classes('text-blue-700 underline')
-            ui.link('LinkedIn ', 'https://www.linkedin.com/in/jader-santos-72162755/', new_tab=True).classes('text-blue-700 underline')
+#    with ui.footer().style('background-color: #f5f5f5; color: #444').classes('w-full justify-center items-center'):
+#        with ui.row().classes('gap-2 items-center'):
+#            ui.label('Jader Santos').classes('font-medium')
+#            ui.link('GitHub', 'https://github.com/msantosjader', new_tab=True).classes('text-blue-700 underline')
+#            ui.link('Instagram', 'https://instagram.com/msantosjader', new_tab=True).classes('text-blue-700 underline')
+#            ui.link('LinkedIn ', 'https://www.linkedin.com/in/jader-santos-72162755/', new_tab=True).classes('text-blue-700 underline')
 
     with ui.column().classes('w-full items-center'):
         content_function()
@@ -92,7 +92,7 @@ def download_page():
                     spinner = ui.spinner('dots').props('size="xl"')
                     loading_label = ui.label('Verificando a base de dados online...').classes('mt-2 text-gray')
                 with ui.card().classes('flex-1 p-2 items-stretch'):
-                    ui.label('Status do Downloads').classes('text-lg font-medium mb-2 text-center')
+                    ui.label('Status dos Downloads').classes('text-lg font-medium mb-2 text-center')
                     with ui.row().classes('w-full gap-2 flex-nowrap items-center'):
                         ui.button('Cancelar Todos', icon='cancel', color='red', on_click=download_manager.cancel_all) \
                             .classes('flex-grow')
